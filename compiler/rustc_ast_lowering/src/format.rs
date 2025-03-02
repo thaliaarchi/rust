@@ -1,5 +1,6 @@
 use core::ops::ControlFlow;
 use std::borrow::Cow;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use rustc_ast::visit::Visitor;
 use rustc_ast::*;
@@ -589,12 +590,16 @@ fn expand_format_args<'hir>(
         )
     };
 
+    static FORMAT_ARGS_ID: AtomicUsize = AtomicUsize::new(1);
+    let fmt_id = ctx.expr_usize(macsp, FORMAT_ARGS_ID.fetch_add(1, Ordering::AcqRel));
+
     if let Some(format_options) = format_options {
         // Generate:
         //     <core::fmt::Arguments>::new_v1_formatted(
         //         lit_pieces,
         //         args,
         //         format_options,
+        //         fmt_id,
         //         unsafe { ::core::fmt::UnsafeArg::new() }
         //     )
         let new_v1_formatted = ctx.arena.alloc(ctx.expr_lang_item_type_relative(
@@ -617,20 +622,22 @@ fn expand_format_args<'hir>(
             span: macsp,
             targeted_by_break: false,
         }));
-        let args = ctx.arena.alloc_from_iter([lit_pieces, args, format_options, unsafe_arg]);
+        let args =
+            ctx.arena.alloc_from_iter([lit_pieces, args, format_options, fmt_id, unsafe_arg]);
         hir::ExprKind::Call(new_v1_formatted, args)
     } else {
         // Generate:
         //     <core::fmt::Arguments>::new_v1(
         //         lit_pieces,
         //         args,
+        //         fmt_id,
         //     )
         let new_v1 = ctx.arena.alloc(ctx.expr_lang_item_type_relative(
             macsp,
             hir::LangItem::FormatArguments,
             sym::new_v1,
         ));
-        let new_args = ctx.arena.alloc_from_iter([lit_pieces, args]);
+        let new_args = ctx.arena.alloc_from_iter([lit_pieces, args, fmt_id]);
         hir::ExprKind::Call(new_v1, new_args)
     }
 }

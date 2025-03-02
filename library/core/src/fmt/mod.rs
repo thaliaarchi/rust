@@ -590,16 +590,23 @@ pub struct Arguments<'a> {
     // Dynamic arguments for interpolation, to be interleaved with string
     // pieces. (Every argument is preceded by a string piece.)
     args: &'a [rt::Argument<'a>],
+
+    // Unique ID for linking info known at compile time and at runtime. An ID of
+    // 0 is used for constant strings.
+    #[allow(dead_code)]
+    #[cfg(not(bootstrap))]
+    id: usize,
 }
 
 /// Used by the format_args!() macro to create a fmt::Arguments object.
+#[cfg(not(bootstrap))]
 #[doc(hidden)]
 #[unstable(feature = "fmt_internals", issue = "none")]
 impl<'a> Arguments<'a> {
     #[inline]
     pub const fn new_const<const N: usize>(pieces: &'a [&'static str; N]) -> Self {
         const { assert!(N <= 1) };
-        Arguments { pieces, fmt: None, args: &[] }
+        Arguments { pieces, fmt: None, args: &[], id: 0 }
     }
 
     /// When using the format_args!() macro, this function is used to generate the
@@ -608,9 +615,10 @@ impl<'a> Arguments<'a> {
     pub const fn new_v1<const P: usize, const A: usize>(
         pieces: &'a [&'static str; P],
         args: &'a [rt::Argument<'a>; A],
+        id: usize,
     ) -> Arguments<'a> {
         const { assert!(P >= A && P <= A + 1, "invalid args") }
-        Arguments { pieces, fmt: None, args }
+        Arguments { pieces, fmt: None, args, id }
     }
 
     /// Specifies nonstandard formatting parameters.
@@ -625,11 +633,46 @@ impl<'a> Arguments<'a> {
         pieces: &'a [&'static str],
         args: &'a [rt::Argument<'a>],
         fmt: &'a [rt::Placeholder],
+        id: usize,
+        _unsafe_arg: rt::UnsafeArg,
+    ) -> Arguments<'a> {
+        Arguments { pieces, fmt: Some(fmt), args, id }
+    }
+}
+
+#[cfg(bootstrap)]
+#[doc(hidden)]
+#[unstable(feature = "fmt_internals", issue = "none")]
+impl<'a> Arguments<'a> {
+    #[inline]
+    pub const fn new_const<const N: usize>(pieces: &'a [&'static str; N]) -> Self {
+        const { assert!(N <= 1) };
+        Arguments { pieces, fmt: None, args: &[] }
+    }
+
+    #[inline]
+    pub const fn new_v1<const P: usize, const A: usize>(
+        pieces: &'a [&'static str; P],
+        args: &'a [rt::Argument<'a>; A],
+    ) -> Arguments<'a> {
+        const { assert!(P >= A && P <= A + 1, "invalid args") }
+        Arguments { pieces, fmt: None, args }
+    }
+
+    #[inline]
+    pub const fn new_v1_formatted(
+        pieces: &'a [&'static str],
+        args: &'a [rt::Argument<'a>],
+        fmt: &'a [rt::Placeholder],
         _unsafe_arg: rt::UnsafeArg,
     ) -> Arguments<'a> {
         Arguments { pieces, fmt: Some(fmt), args }
     }
+}
 
+#[doc(hidden)]
+#[unstable(feature = "fmt_internals", issue = "none")]
+impl<'a> Arguments<'a> {
     /// Estimates the length of the formatted text.
     ///
     /// This is intended to be used for setting initial `String` capacity
