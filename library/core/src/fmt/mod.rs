@@ -12,6 +12,7 @@ use crate::{iter, mem, result, str};
 mod builders;
 #[cfg(not(no_fp_fmt_parse))]
 mod float;
+mod hook;
 #[cfg(no_fp_fmt_parse)]
 mod nofloat;
 mod num;
@@ -216,6 +217,8 @@ pub trait Write {
     /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
     fn write_fmt(&mut self, args: Arguments<'_>) -> Result {
+        write!(hook::Stderr, "[WRITE_FMT] write_fmt").unwrap();
+
         // We use a specialization for `Sized` types to avoid an indirection
         // through `&mut self`
         trait SpecWriteFmt {
@@ -1472,6 +1475,10 @@ pub trait UpperExp {
 /// [`write!`]: crate::write!
 #[stable(feature = "rust1", since = "1.0.0")]
 pub fn write(output: &mut dyn Write, args: Arguments<'_>) -> Result {
+    write_inner(output, args)
+}
+
+pub(crate) fn write_inner(output: &mut dyn Write, args: Arguments<'_>) -> Result {
     let mut formatter = Formatter::new(output, FormattingOptions::new());
     let mut idx = 0;
 
