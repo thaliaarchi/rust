@@ -1,5 +1,6 @@
 use crate::ffi::{c_int, c_size_t, c_ssize_t, c_void};
 use crate::fmt;
+
 pub(crate) struct Stderr;
 
 impl fmt::Write for Stderr {

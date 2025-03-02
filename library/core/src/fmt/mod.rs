@@ -12,6 +12,7 @@ use crate::{iter, mem, result, str};
 mod builders;
 #[cfg(not(no_fp_fmt_parse))]
 mod float;
+#[cfg(not(bootstrap))]
 mod hook;
 #[cfg(no_fp_fmt_parse)]
 mod nofloat;
@@ -217,7 +218,10 @@ pub trait Write {
     /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
     fn write_fmt(&mut self, args: Arguments<'_>) -> Result {
-        write!(hook::Stderr, "[WRITE_FMT] write_fmt").unwrap();
+        #[cfg(not(bootstrap))]
+        if !args.pieces.first().is_some_and(|first| first.starts_with("[WRITE_FMT] ")) {
+            writeln!(hook::Stderr, "[WRITE_FMT] #{}", args.id).unwrap();
+        }
 
         // We use a specialization for `Sized` types to avoid an indirection
         // through `&mut self`
