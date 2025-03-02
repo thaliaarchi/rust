@@ -220,7 +220,7 @@ pub trait Write {
     fn write_fmt(&mut self, args: Arguments<'_>) -> Result {
         #[cfg(not(bootstrap))]
         if !args.pieces.first().is_some_and(|first| first.starts_with("[WRITE_FMT] ")) {
-            writeln!(hook::Stderr, "[WRITE_FMT] #{}", args.id).unwrap();
+            writeln!(hook::Stderr, "[WRITE_FMT] {:?}", args.id).unwrap();
         }
 
         // We use a specialization for `Sized` types to avoid an indirection
@@ -598,12 +598,15 @@ pub struct Arguments<'a> {
     // pieces. (Every argument is preceded by a string piece.)
     args: &'a [rt::Argument<'a>],
 
-    // Unique ID for linking info known at compile time and at runtime. An ID of
-    // 0 is used for constant strings.
+    // Unique ID for linking info known at compile time and at runtime. Constant
+    // strings have no ID.
     #[allow(dead_code)]
     #[cfg(not(bootstrap))]
-    id: usize,
+    id: Option<ArgumentsId>,
 }
+
+#[cfg(not(bootstrap))]
+type ArgumentsId = &'static str;
 
 /// Used by the format_args!() macro to create a fmt::Arguments object.
 #[cfg(not(bootstrap))]
@@ -613,7 +616,7 @@ impl<'a> Arguments<'a> {
     #[inline]
     pub const fn new_const<const N: usize>(pieces: &'a [&'static str; N]) -> Self {
         const { assert!(N <= 1) };
-        Arguments { pieces, fmt: None, args: &[], id: 0 }
+        Arguments { pieces, fmt: None, args: &[], id: None }
     }
 
     /// When using the format_args!() macro, this function is used to generate the
@@ -622,7 +625,7 @@ impl<'a> Arguments<'a> {
     pub const fn new_v1<const P: usize, const A: usize>(
         pieces: &'a [&'static str; P],
         args: &'a [rt::Argument<'a>; A],
-        id: usize,
+        id: Option<ArgumentsId>,
     ) -> Arguments<'a> {
         const { assert!(P >= A && P <= A + 1, "invalid args") }
         Arguments { pieces, fmt: None, args, id }
@@ -640,7 +643,7 @@ impl<'a> Arguments<'a> {
         pieces: &'a [&'static str],
         args: &'a [rt::Argument<'a>],
         fmt: &'a [rt::Placeholder],
-        id: usize,
+        id: Option<ArgumentsId>,
         _unsafe_arg: rt::UnsafeArg,
     ) -> Arguments<'a> {
         Arguments { pieces, fmt: Some(fmt), args, id }
