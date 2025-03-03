@@ -218,13 +218,6 @@ pub trait Write {
     /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
     fn write_fmt(&mut self, args: Arguments<'_>) -> Result {
-        #[cfg(not(bootstrap))]
-        if !args.pieces.first().is_some_and(|first| first.starts_with("[WRITE_FMT] "))
-            && let Some(id) = args.id
-        {
-            writeln!(hook::Stderr, "[WRITE_FMT] {id:?}").unwrap();
-        }
-
         // We use a specialization for `Sized` types to avoid an indirection
         // through `&mut self`
         trait SpecWriteFmt {
@@ -234,22 +227,14 @@ pub trait Write {
         impl<W: Write + ?Sized> SpecWriteFmt for &mut W {
             #[inline]
             default fn spec_write_fmt(mut self, args: Arguments<'_>) -> Result {
-                if let Some(s) = args.as_statically_known_str() {
-                    self.write_str(s)
-                } else {
-                    write(&mut self, args)
-                }
+                write(&mut self, args)
             }
         }
 
         impl<W: Write> SpecWriteFmt for &mut W {
             #[inline]
             fn spec_write_fmt(self, args: Arguments<'_>) -> Result {
-                if let Some(s) = args.as_statically_known_str() {
-                    self.write_str(s)
-                } else {
-                    write(self, args)
-                }
+                write(self, args)
             }
         }
 
@@ -765,6 +750,7 @@ impl<'a> Arguments<'a> {
     }
 
     /// Same as [`Arguments::as_str`], but will only return `Some(s)` if it can be determined at compile time.
+    #[expect(dead_code)]
     #[must_use]
     #[inline]
     fn as_statically_known_str(&self) -> Option<&'static str> {
@@ -1484,6 +1470,13 @@ pub trait UpperExp {
 /// [`write!`]: crate::write!
 #[stable(feature = "rust1", since = "1.0.0")]
 pub fn write(output: &mut dyn Write, args: Arguments<'_>) -> Result {
+    #[cfg(not(bootstrap))]
+    if !args.pieces.first().is_some_and(|first| first.starts_with("[WRITE_FMT] "))
+        && let Some(id) = args.id
+    {
+        writeln!(hook::Stderr, "[WRITE_FMT] {id:?}").unwrap();
+    }
+
     write_inner(output, args)
 }
 
@@ -1974,11 +1967,7 @@ impl<'a> Formatter<'a> {
     #[stable(feature = "rust1", since = "1.0.0")]
     #[inline]
     pub fn write_fmt(&mut self, fmt: Arguments<'_>) -> Result {
-        if let Some(s) = fmt.as_statically_known_str() {
-            self.buf.write_str(s)
-        } else {
-            write(self.buf, fmt)
-        }
+        write(self.buf, fmt)
     }
 
     /// Returns flags for formatting.
@@ -2682,15 +2671,6 @@ impl Write for Formatter<'_> {
 
     fn write_char(&mut self, c: char) -> Result {
         self.buf.write_char(c)
-    }
-
-    #[inline]
-    fn write_fmt(&mut self, args: Arguments<'_>) -> Result {
-        if let Some(s) = args.as_statically_known_str() {
-            self.buf.write_str(s)
-        } else {
-            write(self.buf, args)
-        }
     }
 }
 
