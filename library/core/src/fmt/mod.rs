@@ -219,8 +219,10 @@ pub trait Write {
     #[stable(feature = "rust1", since = "1.0.0")]
     fn write_fmt(&mut self, args: Arguments<'_>) -> Result {
         #[cfg(not(bootstrap))]
-        if !args.pieces.first().is_some_and(|first| first.starts_with("[WRITE_FMT] ")) {
-            writeln!(hook::Stderr, "[WRITE_FMT] {:?}", args.id).unwrap();
+        if !args.pieces.first().is_some_and(|first| first.starts_with("[WRITE_FMT] "))
+            && let Some(id) = args.id
+        {
+            writeln!(hook::Stderr, "[WRITE_FMT] {id:?}").unwrap();
         }
 
         // We use a specialization for `Sized` types to avoid an indirection
